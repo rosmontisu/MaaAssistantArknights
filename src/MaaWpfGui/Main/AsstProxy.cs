@@ -251,7 +251,7 @@ namespace MaaWpfGui.Main
         {
             _logger.Information("Load Resource");
 
-            string clientType = Instances.SettingsViewModel.ClientType;
+            string clientType = SettingsViewModel.GameSettings.ClientType;
             string mainRes = Directory.GetCurrentDirectory();
             string globalResource = mainRes + @"\resource\global\" + clientType;
             string mainCache = Directory.GetCurrentDirectory() + @"\cache";
@@ -1446,7 +1446,7 @@ namespace MaaWpfGui.Main
                 case "StageInfo":
                     {
                         Instances.TaskQueueViewModel.AddLog(LocalizationHelper.GetString("StartCombat") + subTaskDetails!["name"]);
-                        if (Instances.SettingsViewModel.RoguelikeDelayAbortUntilCombatComplete)
+                        if (SettingsViewModel.RoguelikeTask.RoguelikeDelayAbortUntilCombatComplete)
                         {
                             Instances.TaskQueueViewModel.RoguelikeInCombatAndShowWait = true;
                         }
@@ -2013,7 +2013,7 @@ namespace MaaWpfGui.Main
                 };
             }
 
-            taskParams["client_type"] = Instances.SettingsViewModel.ClientType;
+            taskParams["client_type"] = SettingsViewModel.GameSettings.ClientType;
             taskParams["penguin_id"] = Instances.SettingsViewModel.PenguinId;
             taskParams["DrGrandet"] = Instances.SettingsViewModel.IsDrGrandet;
             taskParams["expiring_medicine"] = isMainFight && Instances.SettingsViewModel.UseExpiringMedicine ? 9999 : 0;

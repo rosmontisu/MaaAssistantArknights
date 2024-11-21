@@ -45,7 +45,7 @@ public class StartSettingsUserControlModel : PropertyChangedBase
 
     private static ConnectSettingsUserControlModel ConnectSettings => SettingsViewModel.ConnectSettings;
 
-    private static VersionUpdateSettingsUserControlModel VersionUpdateSettings => SettingsViewModel.VersionUpdateDataContext;
+    private static VersionUpdateSettingsUserControlModel VersionUpdateSettings => SettingsViewModel.VersionUpdateSettings;
 
     private bool _startSelf = AutoStart.CheckStart();
 
@@ -110,9 +110,9 @@ public class StartSettingsUserControlModel : PropertyChangedBase
         {
             SetAndNotify(ref _openEmulatorAfterLaunch, value);
             ConfigurationHelper.SetValue(ConfigurationKeys.StartEmulator, value.ToString());
-            if (Instances.SettingsViewModel.ClientType == string.Empty && _runningState.GetIdle())
+            if (SettingsViewModel.GameSettings.ClientType == string.Empty && _runningState.GetIdle())
             {
-                Instances.SettingsViewModel.ClientType = "Official";
+                SettingsViewModel.GameSettings.ClientType = "Official";
             }
         }
     }

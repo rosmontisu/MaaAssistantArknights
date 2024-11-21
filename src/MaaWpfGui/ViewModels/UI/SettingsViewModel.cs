@@ -17,29 +17,21 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Management;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using HandyControl.Controls;
 using HandyControl.Data;
-using MaaWpfGui.Configuration;
 using MaaWpfGui.Constants;
 using MaaWpfGui.Extensions;
 using MaaWpfGui.Helper;
 using MaaWpfGui.Main;
 using MaaWpfGui.Models;
 using MaaWpfGui.Services.HotKeys;
-using MaaWpfGui.Services.RemoteControl;
 using MaaWpfGui.States;
-using MaaWpfGui.Utilities;
 using MaaWpfGui.Utilities.ValueType;
 using MaaWpfGui.ViewModels.UserControl.Settings;
 using MaaWpfGui.ViewModels.UserControl.TaskQueue;
@@ -49,7 +41,6 @@ using Newtonsoft.Json.Linq;
 using Serilog;
 using Stylet;
 using ComboBox = System.Windows.Controls.ComboBox;
-using DarkModeType = MaaWpfGui.Configuration.GUI.DarkModeType;
 using Timer = System.Timers.Timer;
 
 namespace MaaWpfGui.ViewModels.UI
@@ -72,11 +63,6 @@ namespace MaaWpfGui.ViewModels.UI
         private static extern bool IsIconic(IntPtr hWnd);
 
         /// <summary>
-        /// The Pallas language key.
-        /// </summary>
-        public const string PallasLangKey = "pallas";
-
-        /// <summary>
         /// Gets the visibility of task setting views.
         /// </summary>
         public TaskSettingVisibilityInfo TaskSettingVisibilities { get; } = TaskSettingVisibilityInfo.Current;
@@ -89,6 +75,11 @@ namespace MaaWpfGui.ViewModels.UI
         #region 长草任务Model
 
         /// <summary>
+        /// Gets 肉鸽任务Model
+        /// </summary>
+        public static RoguelikeSettingsUserControlModel RoguelikeTask { get; } = new();
+
+        /// <summary>
         /// Gets 生稀盐酸任务Model
         /// </summary>
         public static ReclamationSettingsUserControlModel ReclamationTask { get; } = new();
@@ -96,6 +87,11 @@ namespace MaaWpfGui.ViewModels.UI
         #endregion 长草任务Model
 
         #region 设置界面Model
+
+        /// <summary>
+        /// Gets 游戏设置model
+        /// </summary>
+        public static GameSettingsUserControlModel GameSettings { get; } = new();
 
         /// <summary>
         /// Gets 连接设置model
@@ -108,14 +104,29 @@ namespace MaaWpfGui.ViewModels.UI
         public static StartSettingsUserControlModel StartSettings { get; } = new();
 
         /// <summary>
+        /// Gets 界面设置model
+        /// </summary>
+        public static GuiSettingsUserControlModel GuiSettings { get; } = new();
+
+        /// <summary>
+        /// Gets 定时设置model
+        /// </summary>
+        public static TimerSettingsUserControlModel TimerSettings { get; } = new();
+
+        /// <summary>
+        /// Gets 远程控制model
+        /// </summary>
+        public static RemoteControlUserControlModel RemoteControlSettings { get; } = new();
+
+        /// <summary>
         /// Gets 软件更新model
         /// </summary>
-        public static VersionUpdateSettingsUserControlModel VersionUpdateDataContext { get; } = new();
+        public static VersionUpdateSettingsUserControlModel VersionUpdateSettings { get; } = new();
 
         /// <summary>
         /// Gets 外部通知model
         /// </summary>
-        public static ExternalNotificationSettingsUserControlModel ExternalNotificationDataContext { get; } = new();
+        public static ExternalNotificationSettingsUserControlModel ExternalNotificationSettings { get; } = new();
 
         #endregion 设置界面Model
 
@@ -174,7 +185,7 @@ namespace MaaWpfGui.ViewModels.UI
         private void Init()
         {
             InitInfrast();
-            InitRoguelike();
+            RoguelikeTask.InitRoguelike();
             InitConfiguration();
             InitUiSettings();
             InitConnectConfig();
@@ -236,14 +247,6 @@ namespace MaaWpfGui.ViewModels.UI
             _dormThresholdLabel = LocalizationHelper.GetString("DormThreshold") + ": " + _dormThreshold + "%";
         }
 
-        private void InitRoguelike()
-        {
-            UpdateRoguelikeDifficultyList();
-            UpdateRoguelikeModeList();
-            UpdateRoguelikeSquadList();
-            UpdateRoguelikeCoreCharList();
-        }
-
         private void InitConfiguration()
         {
             var configurations = new ObservableCollection<CombinedData>();
@@ -262,9 +265,8 @@ namespace MaaWpfGui.ViewModels.UI
                                 select new CombinedData { Display = pair.Value, Value = pair.Key })
                .ToList();
 
-            LanguageList = languageList;
-
-            SwitchDarkMode();
+            GuiSettings.LanguageList = languageList;
+            GuiSettings.SwitchDarkMode();
         }
 
         private void InitConnectConfig()
@@ -278,15 +280,20 @@ namespace MaaWpfGui.ViewModels.UI
 
         private void InitVersionUpdate()
         {
-            if (VersionUpdateDataContext.VersionType == VersionUpdateSettingsUserControlModel.UpdateVersionType.Nightly && !VersionUpdateDataContext.AllowNightlyUpdates)
+            if (VersionUpdateSettings.VersionType == VersionUpdateSettingsUserControlModel.UpdateVersionType.Nightly && !VersionUpdateSettings.AllowNightlyUpdates)
             {
-                VersionUpdateDataContext.VersionType = VersionUpdateSettingsUserControlModel.UpdateVersionType.Beta;
+                VersionUpdateSettings.VersionType = VersionUpdateSettingsUserControlModel.UpdateVersionType.Beta;
             }
         }
 
         #endregion Init
 
         #region EasterEggs
+
+        /// <summary>
+        /// The Pallas language key.
+        /// </summary>
+        public const string PallasLangKey = "pallas";
 
         private bool _cheers = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.Cheers, bool.FalseString));
 
@@ -357,7 +364,7 @@ namespace MaaWpfGui.ViewModels.UI
 
         public void Sober()
         {
-            if (!Cheers || Language != PallasLangKey)
+            if (!Cheers || GuiSettings.Language != PallasLangKey)
             {
                 return;
             }
@@ -402,63 +409,6 @@ namespace MaaWpfGui.ViewModels.UI
 
         #endregion EasterEggs
 
-        #region Remote Control
-
-        private string _remoteControlGetTaskEndpointUri = ConfigurationHelper.GetValue(ConfigurationKeys.RemoteControlGetTaskEndpointUri, string.Empty);
-
-        public string RemoteControlGetTaskEndpointUri
-        {
-            get => _remoteControlGetTaskEndpointUri;
-            set
-            {
-                if (!SetAndNotify(ref _remoteControlGetTaskEndpointUri, value))
-                {
-                    return;
-                }
-
-                Instances.RemoteControlService.InitializePollJobTask();
-                ConfigurationHelper.SetValue(ConfigurationKeys.RemoteControlGetTaskEndpointUri, value);
-            }
-        }
-
-        private string _remoteControlReportStatusUri = ConfigurationHelper.GetValue(ConfigurationKeys.RemoteControlReportStatusUri, string.Empty);
-
-        public string RemoteControlReportStatusUri
-        {
-            get => _remoteControlReportStatusUri;
-            set
-            {
-                SetAndNotify(ref _remoteControlReportStatusUri, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RemoteControlReportStatusUri, value);
-            }
-        }
-
-        private string _remoteControlUserIdentity = ConfigurationHelper.GetValue(ConfigurationKeys.RemoteControlUserIdentity, string.Empty);
-
-        public string RemoteControlUserIdentity
-        {
-            get => _remoteControlUserIdentity;
-            set
-            {
-                SetAndNotify(ref _remoteControlUserIdentity, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RemoteControlUserIdentity, value);
-            }
-        }
-
-        private string _remoteControlDeviceIdentity = ConfigurationHelper.GetValue(ConfigurationKeys.RemoteControlDeviceIdentity, string.Empty);
-
-        public string RemoteControlDeviceIdentity
-        {
-            get => _remoteControlDeviceIdentity;
-            set
-            {
-                SetAndNotify(ref _remoteControlDeviceIdentity, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RemoteControlDeviceIdentity, value);
-            }
-        }
-
-        #endregion Remote Control
-
         #region Performance
 
         public List<GpuOption> GpuOptions => GpuOption.GetGpuOptions();
@@ -493,24 +443,6 @@ namespace MaaWpfGui.ViewModels.UI
 
         #endregion Performance
 
-        #region 游戏设置
-
-        /// <summary>
-        /// Gets the list of the client types.
-        /// </summary>
-        public List<CombinedData> ClientTypeList { get; } =
-        [
-            new() { Display = LocalizationHelper.GetString("NotSelected"), Value = string.Empty },
-            new() { Display = LocalizationHelper.GetString("Official"), Value = "Official" },
-            new() { Display = LocalizationHelper.GetString("Bilibili"), Value = "Bilibili" },
-            new() { Display = LocalizationHelper.GetString("YoStarEN"), Value = "YoStarEN" },
-            new() { Display = LocalizationHelper.GetString("YoStarJP"), Value = "YoStarJP" },
-            new() { Display = LocalizationHelper.GetString("YoStarKR"), Value = "YoStarKR" },
-            new() { Display = LocalizationHelper.GetString("Txwy"), Value = "txwy" },
-        ];
-
-        #endregion
-
         #region 开始唤醒
 
         private string _accountName = ConfigurationHelper.GetValue(ConfigurationKeys.AccountName, string.Empty);
@@ -531,61 +463,6 @@ namespace MaaWpfGui.ViewModels.UI
         {
             Instances.TaskQueueViewModel.QuickSwitchAccount();
         }
-
-        private string _clientType = ConfigurationHelper.GetValue(ConfigurationKeys.ClientType, string.Empty);
-
-        /// <summary>
-        /// Gets or sets the client type.
-        /// </summary>
-        public string ClientType
-        {
-            get => _clientType;
-            set
-            {
-                SetAndNotify(ref _clientType, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.ClientType, value);
-                VersionUpdateDataContext.ResourceInfo = VersionUpdateSettingsUserControlModel.GetResourceVersionByClientType(_clientType);
-                VersionUpdateDataContext.ResourceVersion = VersionUpdateDataContext.ResourceInfo.VersionName;
-                VersionUpdateDataContext.ResourceDateTime = VersionUpdateDataContext.ResourceInfo.DateTime;
-                Instances.SettingsViewModel.UpdateWindowTitle(); // 每次修改客户端时更新WindowTitle
-                Instances.TaskQueueViewModel.UpdateStageList();
-                Instances.TaskQueueViewModel.UpdateDatePrompt();
-                Instances.AsstProxy.LoadResource();
-                AskRestartToApplySettings(_clientType is "YoStarEN");
-            }
-        }
-
-        /// <summary>
-        /// Gets the client type.
-        /// </summary>
-        public string ClientName
-        {
-            get
-            {
-                foreach (var item in Instances.SettingsViewModel.ClientTypeList.Where(item => item.Value == ClientType))
-                {
-                    return item.Display;
-                }
-
-                return "Unknown Client";
-            }
-        }
-
-        private readonly Dictionary<string, string> _serverMapping = new()
-        {
-            { string.Empty, "CN" },
-            { "Official", "CN" },
-            { "Bilibili", "CN" },
-            { "YoStarEN", "US" },
-            { "YoStarJP", "JP" },
-            { "YoStarKR", "KR" },
-            { "txwy", "ZH_TW" },
-        };
-
-        /// <summary>
-        /// Gets the server type.
-        /// </summary>
-        public string ServerType => _serverMapping[ClientType];
 
         #endregion 开始唤醒
 
@@ -1008,672 +885,6 @@ namespace MaaWpfGui.ViewModels.UI
 
         #endregion 基建设置
 
-        #region 肉鸽设置
-
-        private void UpdateRoguelikeDifficultyList()
-        {
-            RoguelikeDifficultyList = [
-                new() { Display = "MAX", Value = int.MaxValue }
-            ];
-
-            for (int i = 20; i >= 0; --i)
-            {
-                var value = i.ToString();
-                RoguelikeDifficultyList.Add(new() { Display = value, Value = i });
-            }
-
-            RoguelikeDifficultyList.Add(new() { Display = LocalizationHelper.GetString("Current"), Value = -1 });
-        }
-
-        private void UpdateRoguelikeModeList()
-        {
-            var roguelikeMode = RoguelikeMode;
-
-            RoguelikeModeList =
-            [
-                new() { Display = LocalizationHelper.GetString("RoguelikeStrategyExp"), Value = "0" },
-                new() { Display = LocalizationHelper.GetString("RoguelikeStrategyGold"), Value = "1" },
-
-                // new CombData { Display = "两者兼顾，投资过后退出", Value = "2" } // 弃用
-                // new CombData { Display = Localization.GetString("3"), Value = "3" },  // 开发中
-                new() { Display = LocalizationHelper.GetString("RoguelikeStrategyLastReward"), Value = "4" },
-            ];
-
-            switch (RoguelikeTheme)
-            {
-                case "Sami":
-
-                    RoguelikeModeList.Add(new() { Display = LocalizationHelper.GetString("RoguelikeStrategyCollapse"), Value = "5" });
-
-                    break;
-            }
-
-            RoguelikeMode = RoguelikeModeList.Any(x => x.Value == roguelikeMode) ? roguelikeMode : "0";
-        }
-
-        private readonly Dictionary<string, List<(string Key, string Value)>> _squadDictionary = new()
-        {
-            ["Phantom_Default"] =
-            [
-                ("ResearchSquad", "研究分队"),
-            ],
-            ["Mizuki_Default"] =
-            [
-                ("IS2NewSquad1", "心胜于物分队"),
-                ("IS2NewSquad2", "物尽其用分队"),
-                ("IS2NewSquad3", "以人为本分队"),
-                ("ResearchSquad", "研究分队"),
-            ],
-            ["Sami_Default"] =
-            [
-                ("IS3NewSquad1", "永恒狩猎分队"),
-                ("IS3NewSquad2", "生活至上分队"),
-                ("IS3NewSquad3", "科学主义分队"),
-                ("IS3NewSquad4", "特训分队"),
-            ],
-            ["Sarkaz_1"] =
-            [
-                ("IS4NewSquad2", "博闻广记分队"),
-                ("IS4NewSquad3", "蓝图测绘分队"),
-                ("IS4NewSquad6", "点刺成锭分队"),
-                ("IS4NewSquad7", "拟态学者分队"),
-            ],
-            ["Sarkaz_Default"] =
-            [
-                ("IS4NewSquad1", "魂灵护送分队"),
-                ("IS4NewSquad2", "博闻广记分队"),
-                ("IS4NewSquad3", "蓝图测绘分队"),
-                ("IS4NewSquad4", "因地制宜分队"),
-                ("IS4NewSquad5", "异想天开分队"),
-                ("IS4NewSquad6", "点刺成锭分队"),
-                ("IS4NewSquad7", "拟态学者分队"),
-            ],
-        };
-
-        // 通用分队
-        private readonly List<(string Key, string Value)> _commonSquads =
-        [
-            ("LeaderSquad", "指挥分队"),
-            ("GatheringSquad", "集群分队"),
-            ("SupportSquad", "后勤分队"),
-            ("SpearheadSquad", "矛头分队"),
-            ("TacticalAssaultOperative", "突击战术分队"),
-            ("TacticalFortificationOperative", "堡垒战术分队"),
-            ("TacticalRangedOperative", "远程战术分队"),
-            ("TacticalDestructionOperative", "破坏战术分队"),
-            ("First-ClassSquad", "高规格分队"),
-        ];
-
-        private void UpdateRoguelikeSquadList()
-        {
-            var roguelikeSquad = RoguelikeSquad;
-            RoguelikeSquadList =
-            [
-                new() { Display = LocalizationHelper.GetString("DefaultSquad"), Value = string.Empty }
-            ];
-
-            // 优先匹配 Theme_Mode，其次匹配 Theme_Default
-            string themeKey = $"{RoguelikeTheme}_{RoguelikeMode}";
-            if (!_squadDictionary.ContainsKey(themeKey))
-            {
-                themeKey = $"{RoguelikeTheme}_Default";
-            }
-
-            // 添加主题分队
-            if (_squadDictionary.TryGetValue(themeKey, out var squads))
-            {
-                foreach (var (key, value) in squads)
-                {
-                    RoguelikeSquadList.Add(new() { Display = LocalizationHelper.GetString(key), Value = value });
-                }
-            }
-
-            // 添加通用分队
-            foreach (var (key, value) in _commonSquads)
-            {
-                RoguelikeSquadList.Add(new() { Display = LocalizationHelper.GetString(key), Value = value });
-            }
-
-            // 选择当前分队
-            RoguelikeSquad = RoguelikeSquadList.Any(x => x.Value == roguelikeSquad) ? roguelikeSquad : string.Empty;
-        }
-
-        private void UpdateRoguelikeCoreCharList()
-        {
-            var filePath = $"resource/roguelike/{RoguelikeTheme}/recruitment.json";
-            if (!File.Exists(filePath))
-            {
-                RoguelikeCoreCharList.Clear();
-                return;
-            }
-
-            var jsonStr = File.ReadAllText(filePath);
-            var json = (JObject?)JsonConvert.DeserializeObject(jsonStr);
-
-            var roguelikeCoreCharList = new ObservableCollection<string>();
-
-            if (json?["priority"] is JArray priorityArray)
-            {
-                foreach (var priorityItem in priorityArray)
-                {
-                    if (priorityItem?["opers"] is not JArray opersArray)
-                    {
-                        continue;
-                    }
-
-                    foreach (var operItem in opersArray)
-                    {
-                        var isStart = (bool?)operItem["is_start"] ?? false;
-                        if (!isStart)
-                        {
-                            continue;
-                        }
-
-                        var name = (string?)operItem["name"];
-                        if (string.IsNullOrEmpty(name))
-                        {
-                            continue;
-                        }
-
-                        var localizedName = DataHelper.GetLocalizedCharacterName(name, OperNameLocalization);
-                        if (!string.IsNullOrEmpty(localizedName) && !(_clientType.Contains("YoStar") && DataHelper.GetLocalizedCharacterName(name, "en-us") == DataHelper.GetLocalizedCharacterName(name, "zh-cn")))
-                        {
-                            roguelikeCoreCharList.Add(localizedName);
-                        }
-                    }
-                }
-            }
-
-            RoguelikeCoreCharList = roguelikeCoreCharList;
-        }
-
-        /// <summary>
-        /// Gets the list of roguelike lists.
-        /// </summary>
-        public List<CombinedData> RoguelikeThemeList { get; } =
-            [
-                new() { Display = LocalizationHelper.GetString("RoguelikeThemePhantom"), Value = "Phantom" },
-                new() { Display = LocalizationHelper.GetString("RoguelikeThemeMizuki"), Value = "Mizuki" },
-                new() { Display = LocalizationHelper.GetString("RoguelikeThemeSami"), Value = "Sami" },
-                new() { Display = LocalizationHelper.GetString("RoguelikeThemeSarkaz"), Value = "Sarkaz" },
-            ];
-
-        private ObservableCollection<GenericCombinedData<int>> _roguelikeDifficultyList = [];
-
-        public ObservableCollection<GenericCombinedData<int>> RoguelikeDifficultyList
-        {
-            get => _roguelikeDifficultyList;
-            set => SetAndNotify(ref _roguelikeDifficultyList, value);
-        }
-
-        private ObservableCollection<CombinedData> _roguelikeModeList = [];
-
-        /// <summary>
-        /// Gets or sets the list of roguelike modes.
-        /// </summary>
-        public ObservableCollection<CombinedData> RoguelikeModeList
-        {
-            get => _roguelikeModeList;
-            set => SetAndNotify(ref _roguelikeModeList, value);
-        }
-
-        private ObservableCollection<CombinedData> _roguelikeSquadList = [];
-
-        /// <summary>
-        /// Gets or sets the list of roguelike squad.
-        /// </summary>
-        public ObservableCollection<CombinedData> RoguelikeSquadList
-        {
-            get => _roguelikeSquadList;
-            set => SetAndNotify(ref _roguelikeSquadList, value);
-        }
-
-        /// <summary>
-        /// Gets the list of roguelike roles.
-        /// </summary>
-        public List<CombinedData> RoguelikeRolesList { get; } =
-            [
-                new() { Display = LocalizationHelper.GetString("DefaultRoles"), Value = string.Empty },
-                new() { Display = LocalizationHelper.GetString("FirstMoveAdvantage"), Value = "先手必胜" },
-                new() { Display = LocalizationHelper.GetString("SlowAndSteadyWinsTheRace"), Value = "稳扎稳打" },
-                new() { Display = LocalizationHelper.GetString("OvercomingYourWeaknesses"), Value = "取长补短" },
-                new() { Display = LocalizationHelper.GetString("AsYourHeartDesires"), Value = "随心所欲" },
-            ];
-
-        // public List<CombData> RoguelikeCoreCharList { get; set; }
-        private string _roguelikeTheme = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeTheme, "Sarkaz");
-
-        /// <summary>
-        /// Gets or sets the Roguelike theme.
-        /// </summary>
-        public string RoguelikeTheme
-        {
-            get => _roguelikeTheme;
-            set
-            {
-                SetAndNotify(ref _roguelikeTheme, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeTheme, value);
-
-                UpdateRoguelikeModeList();
-                UpdateRoguelikeSquadList();
-                UpdateRoguelikeCoreCharList();
-            }
-        }
-
-        private int _roguelikeDifficulty = Convert.ToInt32(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeDifficulty, int.MaxValue.ToString()));
-
-        public int RoguelikeDifficulty
-        {
-            get => _roguelikeDifficulty;
-            set
-            {
-                SetAndNotify(ref _roguelikeDifficulty, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeDifficulty, value.ToString());
-            }
-        }
-
-        private string _roguelikeMode = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeMode, "0");
-
-        /// <summary>
-        /// Gets or sets 策略，往后打 / 刷一层就退 / 烧热水
-        /// </summary>
-        public string RoguelikeMode
-        {
-            get => _roguelikeMode;
-            set
-            {
-                if (value == "1")
-                {
-                    RoguelikeInvestmentEnabled = true;
-                }
-
-                SetAndNotify(ref _roguelikeMode, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeMode, value);
-
-                UpdateRoguelikeSquadList();
-            }
-        }
-
-        private string _roguelikeSquad = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeSquad, string.Empty);
-
-        /// <summary>
-        /// Gets or sets the roguelike squad.
-        /// </summary>
-        public string RoguelikeSquad
-        {
-            get => _roguelikeSquad;
-            set
-            {
-                SetAndNotify(ref _roguelikeSquad, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeSquad, value);
-            }
-        }
-
-        public bool RoguelikeSquadIsProfessional =>
-            RoguelikeMode == "4" &&
-            RoguelikeTheme != "Phantom" &&
-            RoguelikeSquad is "突击战术分队" or "堡垒战术分队" or "远程战术分队" or "破坏战术分队";
-
-        public bool RoguelikeSquadIsFoldartal =>
-            RoguelikeMode == "4" &&
-            RoguelikeTheme == "Sami" &&
-            RoguelikeSquad == "生活至上分队";
-
-        private string _roguelikeRoles = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeRoles, string.Empty);
-
-        /// <summary>
-        /// Gets or sets the roguelike roles.
-        /// </summary>
-        public string RoguelikeRoles
-        {
-            get => _roguelikeRoles;
-            set
-            {
-                SetAndNotify(ref _roguelikeRoles, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeRoles, value);
-            }
-        }
-
-        private string _roguelikeCoreChar = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeCoreChar, string.Empty);
-
-        /// <summary>
-        /// Gets or sets the roguelike core character.
-        /// </summary>
-        public string RoguelikeCoreChar
-        {
-            get => _roguelikeCoreChar;
-            set
-            {
-                if (_roguelikeCoreChar == (value ??= string.Empty))
-                {
-                    return;
-                }
-
-                SetAndNotify(ref _roguelikeCoreChar, value);
-                Instances.TaskQueueViewModel.AddLog(value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeCoreChar, value);
-            }
-        }
-
-        private ObservableCollection<string> _roguelikeCoreCharList = [];
-
-        /// <summary>
-        /// Gets the roguelike core character.
-        /// </summary>
-        public ObservableCollection<string> RoguelikeCoreCharList
-        {
-            get => _roguelikeCoreCharList;
-            private set
-            {
-                if (!string.IsNullOrEmpty(RoguelikeCoreChar) && !value.Contains(RoguelikeCoreChar))
-                {
-                    value.Add(RoguelikeCoreChar);
-                }
-
-                SetAndNotify(ref _roguelikeCoreCharList, value);
-            }
-        }
-
-        private bool _roguelikeStartWithEliteTwo = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeStartWithEliteTwo, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether core char need start with elite two.
-        /// </summary>
-        public bool RoguelikeStartWithEliteTwoRaw
-        {
-            get => _roguelikeStartWithEliteTwo;
-            set
-            {
-                switch (value)
-                {
-                    case true when RoguelikeUseSupportUnit:
-                        RoguelikeUseSupportUnit = false;
-                        break;
-
-                    case false when RoguelikeOnlyStartWithEliteTwoRaw:
-                        RoguelikeOnlyStartWithEliteTwoRaw = false;
-                        break;
-                }
-
-                SetAndNotify(ref _roguelikeStartWithEliteTwo, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeStartWithEliteTwo, value.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether core char need start with elite two.
-        /// </summary>
-        public bool RoguelikeStartWithEliteTwo => _roguelikeStartWithEliteTwo && RoguelikeSquadIsProfessional;
-
-        private bool _roguelikeOnlyStartWithEliteTwo = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeOnlyStartWithEliteTwo, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether only need with elite two's core char.
-        /// </summary>
-        public bool RoguelikeOnlyStartWithEliteTwoRaw
-        {
-            get => _roguelikeOnlyStartWithEliteTwo;
-            set
-            {
-                SetAndNotify(ref _roguelikeOnlyStartWithEliteTwo, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeOnlyStartWithEliteTwo, value.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether only need with elite two's core char.
-        /// </summary>
-        public bool RoguelikeOnlyStartWithEliteTwo => _roguelikeOnlyStartWithEliteTwo && RoguelikeStartWithEliteTwo;
-
-        private bool _roguelike3FirstFloorFoldartal = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.Roguelike3FirstFloorFoldartal, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether core char need start with elite two.
-        /// </summary>
-        public bool Roguelike3FirstFloorFoldartalRaw
-        {
-            get => _roguelike3FirstFloorFoldartal;
-            set
-            {
-                SetAndNotify(ref _roguelike3FirstFloorFoldartal, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.Roguelike3FirstFloorFoldartal, value.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether core char need start with elite two.
-        /// </summary>
-        public bool Roguelike3FirstFloorFoldartal => _roguelike3FirstFloorFoldartal && RoguelikeMode == "4" && RoguelikeTheme == "Sami";
-
-        private string _roguelike3StartFloorFoldartal = ConfigurationHelper.GetValue(ConfigurationKeys.Roguelike3StartFloorFoldartal, string.Empty);
-
-        public string Roguelike3StartFloorFoldartal
-        {
-            get => _roguelike3StartFloorFoldartal;
-            set
-            {
-                SetAndNotify(ref _roguelike3StartFloorFoldartal, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.Roguelike3StartFloorFoldartal, value);
-            }
-        }
-
-        private bool _roguelike3NewSquad2StartingFoldartal = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.Roguelike3NewSquad2StartingFoldartal, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether core char need start with elite two.
-        /// </summary>
-        public bool Roguelike3NewSquad2StartingFoldartalRaw
-        {
-            get => _roguelike3NewSquad2StartingFoldartal;
-            set
-            {
-                SetAndNotify(ref _roguelike3NewSquad2StartingFoldartal, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.Roguelike3NewSquad2StartingFoldartal, value.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether core char need start with elite two.
-        /// </summary>
-        public bool Roguelike3NewSquad2StartingFoldartal => _roguelike3NewSquad2StartingFoldartal && RoguelikeSquadIsFoldartal;
-
-        private string _roguelike3NewSquad2StartingFoldartals = ConfigurationHelper.GetValue(ConfigurationKeys.Roguelike3NewSquad2StartingFoldartals, string.Empty);
-
-        public string Roguelike3NewSquad2StartingFoldartals
-        {
-            get => _roguelike3NewSquad2StartingFoldartals;
-            set
-            {
-                SetAndNotify(ref _roguelike3NewSquad2StartingFoldartals, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.Roguelike3NewSquad2StartingFoldartals, value);
-            }
-        }
-
-        private string _roguelikeExpectedCollapsalParadigms = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeExpectedCollapsalParadigms, string.Empty);
-
-        /// <summary>
-        /// Gets or sets the expected collapsal paradigms.
-        /// 需要刷的坍缩列表，分号分隔
-        /// </summary>
-        public string RoguelikeExpectedCollapsalParadigms
-        {
-            get => _roguelikeExpectedCollapsalParadigms;
-            set
-            {
-                SetAndNotify(ref _roguelikeExpectedCollapsalParadigms, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeExpectedCollapsalParadigms, value);
-            }
-        }
-
-        private bool _roguelikeUseSupportUnit = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeUseSupportUnit, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to use support unit.
-        /// </summary>
-        public bool RoguelikeUseSupportUnit
-        {
-            get => _roguelikeUseSupportUnit;
-            set
-            {
-                if (value && RoguelikeStartWithEliteTwo)
-                {
-                    RoguelikeStartWithEliteTwoRaw = false;
-                }
-
-                SetAndNotify(ref _roguelikeUseSupportUnit, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeUseSupportUnit, value.ToString());
-            }
-        }
-
-        private bool _roguelikeEnableNonfriendSupport = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeEnableNonfriendSupport, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether can roguelike support unit belong to nonfriend
-        /// </summary>
-        public bool RoguelikeEnableNonfriendSupport
-        {
-            get => _roguelikeEnableNonfriendSupport;
-            set
-            {
-                SetAndNotify(ref _roguelikeEnableNonfriendSupport, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeEnableNonfriendSupport, value.ToString());
-            }
-        }
-
-        private bool _roguelikeDelayAbortUntilCombatComplete = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeDelayAbortUntilCombatComplete, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether delay abort until battle complete
-        /// </summary>
-        public bool RoguelikeDelayAbortUntilCombatComplete
-        {
-            get => _roguelikeDelayAbortUntilCombatComplete;
-            set
-            {
-                SetAndNotify(ref _roguelikeDelayAbortUntilCombatComplete, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeDelayAbortUntilCombatComplete, value.ToString());
-            }
-        }
-
-        private string _roguelikeStartsCount = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeStartsCount, "9999999");
-
-        /// <summary>
-        /// Gets or sets the start count of roguelike.
-        /// </summary>
-        public int RoguelikeStartsCount
-        {
-            get => int.Parse(_roguelikeStartsCount);
-            set
-            {
-                SetAndNotify(ref _roguelikeStartsCount, value.ToString());
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeStartsCount, value.ToString());
-            }
-        }
-
-        private bool _roguelikeInvestmentEnabled = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeInvestmentEnabled, bool.TrueString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether investment is enabled.
-        /// </summary>
-        public bool RoguelikeInvestmentEnabled
-        {
-            get => _roguelikeInvestmentEnabled;
-            set
-            {
-                SetAndNotify(ref _roguelikeInvestmentEnabled, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeInvestmentEnabled, value.ToString());
-            }
-        }
-
-        private bool _roguelikeInvestmentWithMoreScore = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeInvestmentEnterSecondFloor, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether investment is enabled.
-        /// </summary>
-        public bool RoguelikeInvestmentWithMoreScoreRaw
-        {
-            get => _roguelikeInvestmentWithMoreScore;
-            set
-            {
-                SetAndNotify(ref _roguelikeInvestmentWithMoreScore, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeInvestmentEnterSecondFloor, value.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether investment is enabled.
-        /// </summary>
-        public bool RoguelikeInvestmentWithMoreScore => _roguelikeInvestmentWithMoreScore && RoguelikeMode == "1";
-
-        private bool _roguelikeRefreshTraderWithDice = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeRefreshTraderWithDice, bool.FalseString));
-
-        public bool RoguelikeRefreshTraderWithDiceRaw
-        {
-            get => _roguelikeRefreshTraderWithDice;
-            set
-            {
-                SetAndNotify(ref _roguelikeRefreshTraderWithDice, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeRefreshTraderWithDice, value.ToString());
-            }
-        }
-
-        public bool RoguelikeRefreshTraderWithDice
-        {
-            get => _roguelikeRefreshTraderWithDice && RoguelikeTheme == "Mizuki";
-            set
-            {
-                SetAndNotify(ref _roguelikeRefreshTraderWithDice, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeRefreshTraderWithDice, value.ToString());
-            }
-        }
-
-        private string _roguelikeInvestsCount = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeInvestsCount, "9999999");
-
-        /// <summary>
-        /// Gets or sets the invests count of roguelike.
-        /// </summary>
-        public int RoguelikeInvestsCount
-        {
-            get => int.Parse(_roguelikeInvestsCount);
-            set
-            {
-                SetAndNotify(ref _roguelikeInvestsCount, value.ToString());
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeInvestsCount, value.ToString());
-            }
-        }
-
-        private bool _roguelikeStopWhenInvestmentFull = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeStopWhenInvestmentFull, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to stop when investment is full.
-        /// </summary>
-        public bool RoguelikeStopWhenInvestmentFull
-        {
-            get => _roguelikeStopWhenInvestmentFull;
-            set
-            {
-                SetAndNotify(ref _roguelikeStopWhenInvestmentFull, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeStopWhenInvestmentFull, value.ToString());
-            }
-        }
-
-        private bool _roguelikeStopAtFinalBoss = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeStopAtFinalBoss, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to stop when investment is full.
-        /// </summary>
-        public bool RoguelikeStopAtFinalBoss
-        {
-            get => _roguelikeStopAtFinalBoss;
-            set
-            {
-                SetAndNotify(ref _roguelikeStopAtFinalBoss, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.RoguelikeStopAtFinalBoss, value.ToString());
-            }
-        }
-
-        #endregion 肉鸽设置
-
         #region 信用相关设置
 
         private string _lastCreditFightTaskTime = ConfigurationHelper.GetValue(ConfigurationKeys.LastCreditFightTaskTime, DateTime.UtcNow.ToYjDate().AddDays(-1).ToFormattedString());
@@ -2035,163 +1246,6 @@ namespace MaaWpfGui.ViewModels.UI
         }
 
         #endregion 领取奖励设置
-
-        #region 定时设置
-
-        public class TimerModel
-        {
-            public class TimerProperties : PropertyChangedBase
-            {
-                public TimerProperties(int timeId, bool isOn, int hour, int min, string? timerConfig)
-                {
-                    TimerId = timeId;
-                    _isOn = isOn;
-                    _hour = hour;
-                    _min = min;
-                    if (timerConfig == null || !ConfigurationHelper.GetConfigurationList().Contains(timerConfig))
-                    {
-                        _timerConfig = ConfigurationHelper.GetCurrentConfiguration();
-                    }
-                    else
-                    {
-                        _timerConfig = timerConfig;
-                    }
-                }
-
-                public int TimerId { get; set; }
-
-                private readonly string _timerName = LocalizationHelper.GetString("Timer");
-
-                public string TimerName
-                {
-                    get => $"{_timerName} {TimerId + 1}";
-                }
-
-                private bool _isOn;
-
-                /// <summary>
-                /// Gets or sets a value indicating whether the timer is set.
-                /// </summary>
-                public bool IsOn
-                {
-                    get => _isOn;
-                    set
-                    {
-                        SetAndNotify(ref _isOn, value);
-                        ConfigurationHelper.SetTimer(TimerId, value.ToString());
-                    }
-                }
-
-                private int _hour;
-
-                /// <summary>
-                /// Gets or sets the hour of the timer.
-                /// </summary>
-                public int Hour
-                {
-                    get => _hour;
-                    set
-                    {
-                        SetAndNotify(ref _hour, value);
-                        ConfigurationHelper.SetTimerHour(TimerId, _hour.ToString());
-                    }
-                }
-
-                private int _min;
-
-                /// <summary>
-                /// Gets or sets the minute of the timer.
-                /// </summary>
-                public int Min
-                {
-                    get => _min;
-                    set
-                    {
-                        SetAndNotify(ref _min, value);
-                        ConfigurationHelper.SetTimerMin(TimerId, _min.ToString());
-                    }
-                }
-
-                private string? _timerConfig;
-
-                /// <summary>
-                /// Gets or sets the config of the timer.
-                /// </summary>
-                public string? TimerConfig
-                {
-                    get => _timerConfig;
-                    set
-                    {
-                        SetAndNotify(ref _timerConfig, value ?? ConfigurationHelper.GetCurrentConfiguration());
-                        ConfigurationHelper.SetTimerConfig(TimerId, _timerConfig);
-                    }
-                }
-            }
-
-            public TimerProperties[] Timers { get; set; } = new TimerProperties[8];
-
-            public TimerModel()
-            {
-                for (int i = 0; i < 8; i++)
-                {
-                    Timers[i] = new TimerProperties(
-                        i,
-                        ConfigurationHelper.GetTimer(i, bool.FalseString) == bool.TrueString,
-                        int.Parse(ConfigurationHelper.GetTimerHour(i, $"{i * 3}")),
-                        int.Parse(ConfigurationHelper.GetTimerMin(i, "0")),
-                        ConfigurationHelper.GetTimerConfig(i, ConfigurationHelper.GetCurrentConfiguration()));
-                }
-            }
-        }
-
-        public TimerModel TimerModels { get; set; } = new();
-
-        private bool _forceScheduledStart = Convert.ToBoolean(ConfigurationHelper.GetGlobalValue(ConfigurationKeys.ForceScheduledStart, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to force scheduled start.
-        /// </summary>
-        public bool ForceScheduledStart
-        {
-            get => _forceScheduledStart;
-            set
-            {
-                SetAndNotify(ref _forceScheduledStart, value);
-                ConfigurationHelper.SetGlobalValue(ConfigurationKeys.ForceScheduledStart, value.ToString());
-            }
-        }
-
-        private bool _showWindowBeforeForceScheduledStart = Convert.ToBoolean(ConfigurationHelper.GetGlobalValue(ConfigurationKeys.ShowWindowBeforeForceScheduledStart, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether show window before force scheduled start.
-        /// </summary>
-        public bool ShowWindowBeforeForceScheduledStart
-        {
-            get => _showWindowBeforeForceScheduledStart;
-            set
-            {
-                SetAndNotify(ref _showWindowBeforeForceScheduledStart, value);
-                ConfigurationHelper.SetGlobalValue(ConfigurationKeys.ShowWindowBeforeForceScheduledStart, value.ToString());
-            }
-        }
-
-        private bool _customConfig = Convert.ToBoolean(ConfigurationHelper.GetGlobalValue(ConfigurationKeys.CustomConfig, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to use custom config.
-        /// </summary>
-        public bool CustomConfig
-        {
-            get => _customConfig;
-            set
-            {
-                SetAndNotify(ref _customConfig, value);
-                ConfigurationHelper.SetGlobalValue(ConfigurationKeys.CustomConfig, value.ToString());
-            }
-        }
-
-        #endregion 定时设置
 
         #region 刷理智设置
 
@@ -2737,454 +1791,6 @@ namespace MaaWpfGui.ViewModels.UI
 
         #endregion 自动公招设置
 
-        #region 界面设置
-
-        /// <summary>
-        /// Gets or sets the language list.
-        /// </summary>
-        public List<CombinedData> LanguageList { get; set; }
-
-        /// <summary>
-        /// Gets or sets the list of operator name language settings
-        /// </summary>
-        public List<CombinedData> OperNameLanguageModeList { get; set; } =
-            [
-                new() { Display = LocalizationHelper.GetString("OperNameLanguageMAA"), Value = "OperNameLanguageMAA" },
-                new() { Display = LocalizationHelper.GetString("OperNameLanguageClient"), Value = "OperNameLanguageClient" }
-            ];
-
-        /// <summary>
-        /// Gets the list of dark mode.
-        /// </summary>
-        public List<GenericCombinedData<DarkModeType>> DarkModeList { get; } =
-            [
-                new() { Display = LocalizationHelper.GetString("Light"), Value = DarkModeType.Light },
-                new() { Display = LocalizationHelper.GetString("Dark"), Value = DarkModeType.Dark },
-                new() { Display = LocalizationHelper.GetString("SyncWithOs"), Value = DarkModeType.SyncWithOs },
-            ];
-
-        /// <summary>
-        /// Gets the list of inverse clear modes.
-        /// </summary>
-        public List<CombinedData> InverseClearModeList { get; } =
-            [
-                new() { Display = LocalizationHelper.GetString("Clear"), Value = "Clear" },
-                new() { Display = LocalizationHelper.GetString("Inverse"), Value = "Inverse" },
-                new() { Display = LocalizationHelper.GetString("Switchable"), Value = "ClearInverse" },
-            ];
-
-        private bool _useTray = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.UseTray, bool.TrueString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to use tray icon.
-        /// </summary>
-        public bool UseTray
-        {
-            get => _useTray;
-            set
-            {
-                if (!value)
-                {
-                    MinimizeToTray = false;
-                }
-
-                SetAndNotify(ref _useTray, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.UseTray, value.ToString());
-                Instances.MainWindowManager.SetUseTrayIcon(value);
-            }
-        }
-
-        private bool _minimizeToTray = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.MinimizeToTray, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to minimize to tray.
-        /// </summary>
-        public bool MinimizeToTray
-        {
-            get => _minimizeToTray;
-            set
-            {
-                SetAndNotify(ref _minimizeToTray, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.MinimizeToTray, value.ToString());
-                Instances.MainWindowManager.SetMinimizeToTray(value);
-            }
-        }
-
-        private bool _windowTitleScrollable = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.WindowTitleScrollable, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to make window title scrollable.
-        /// </summary>
-        public bool WindowTitleScrollable
-        {
-            get => _windowTitleScrollable;
-            set
-            {
-                SetAndNotify(ref _windowTitleScrollable, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.WindowTitleScrollable, value.ToString());
-                var rvm = (RootViewModel)this.Parent;
-                rvm.WindowTitleScrollable = value;
-            }
-        }
-
-        private bool _hideCloseButton = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.HideCloseButton, bool.FalseString));
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to hide close button.
-        /// </summary>
-        public bool HideCloseButton
-        {
-            get => _hideCloseButton;
-            set
-            {
-                SetAndNotify(ref _hideCloseButton, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.HideCloseButton, value.ToString());
-                var rvm = (RootViewModel)this.Parent;
-                rvm.ShowCloseButton = !value;
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether to use notification.
-        /// </summary>
-        public bool UseNotify
-        {
-            get => ConfigFactory.CurrentConfig.GUI.UseNotify;
-            set
-            {
-                ConfigFactory.CurrentConfig.GUI.UseNotify = value;
-                NotifyOfPropertyChange();
-                if (value)
-                {
-                    ToastNotification.ShowDirect("Test test");
-                }
-            }
-        }
-
-        private bool _useLogItemDateFormat = true; // Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.UseLogItemDateFormat, bool.FalseString));
-
-        public bool UseLogItemDateFormat
-        {
-            get => _useLogItemDateFormat;
-            set
-            {
-                SetAndNotify(ref _useLogItemDateFormat, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.UseLogItemDateFormat, value.ToString());
-            }
-        }
-
-        public List<string> LogItemDateFormatStringList { get; } =
-        [
-            "HH:mm:ss",
-            "MM-dd  HH:mm:ss",
-            "MM/dd  HH:mm:ss",
-            "MM.dd  HH:mm:ss",
-            "dd-MM  HH:mm:ss",
-            "dd/MM  HH:mm:ss",
-            "dd.MM  HH:mm:ss",
-        ];
-
-        private string _logItemDateFormatString = ConfigurationHelper.GetValue(ConfigurationKeys.LogItemDateFormat, "HH:mm:ss");
-
-        public string LogItemDateFormatString
-        {
-            get => _logItemDateFormatString;
-            set
-            {
-                SetAndNotify(ref _logItemDateFormatString, value);
-                ConfigurationHelper.SetValue(ConfigurationKeys.LogItemDateFormat, value);
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the dark mode.
-        /// </summary>
-        public DarkModeType DarkMode
-        {
-            get => ConfigFactory.CurrentConfig.GUI.DarkMode;
-            set
-            {
-                ConfigFactory.CurrentConfig.GUI.DarkMode = value;
-                NotifyOfPropertyChange();
-                SwitchDarkMode();
-
-                /*
-                AskToRestartToApplySettings();
-                */
-            }
-        }
-
-        public void SwitchDarkMode()
-        {
-            DarkModeType darkModeType = ConfigFactory.CurrentConfig.GUI.DarkMode;
-            switch (darkModeType)
-            {
-                case DarkModeType.Light:
-                    ThemeHelper.SwitchToLightMode();
-                    break;
-
-                case DarkModeType.Dark:
-                    ThemeHelper.SwitchToDarkMode();
-                    break;
-
-                case DarkModeType.SyncWithOs:
-                    ThemeHelper.SwitchToSyncWithOsMode();
-                    break;
-
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-        }
-
-        private enum InverseClearType
-        {
-            Clear,
-            Inverse,
-            ClearInverse,
-        }
-
-        private InverseClearType _inverseClearMode =
-            Enum.TryParse(ConfigurationHelper.GetValue(ConfigurationKeys.InverseClearMode, InverseClearType.Clear.ToString()), out InverseClearType temp)
-                ? temp
-                : InverseClearType.Clear;
-
-        /// <summary>
-        /// Gets or sets the inverse clear mode.
-        /// </summary>
-        public string InverseClearMode
-        {
-            get => _inverseClearMode.ToString();
-            set
-            {
-                if (!Enum.TryParse(value, out InverseClearType tempEnumValue))
-                {
-                    return;
-                }
-
-                SetAndNotify(ref _inverseClearMode, tempEnumValue);
-                ConfigurationHelper.SetValue(ConfigurationKeys.InverseClearMode, value);
-                switch (tempEnumValue)
-                {
-                    case InverseClearType.Clear:
-                        Instances.TaskQueueViewModel.InverseMode = false;
-                        Instances.TaskQueueViewModel.ShowInverse = false;
-                        Instances.TaskQueueViewModel.SelectedAllWidth = 90;
-                        break;
-
-                    case InverseClearType.Inverse:
-                        Instances.TaskQueueViewModel.InverseMode = true;
-                        Instances.TaskQueueViewModel.ShowInverse = false;
-                        Instances.TaskQueueViewModel.SelectedAllWidth = 90;
-                        break;
-
-                    case InverseClearType.ClearInverse:
-                        Instances.TaskQueueViewModel.ShowInverse = true;
-                        Instances.TaskQueueViewModel.SelectedAllWidth = TaskQueueViewModel.SelectedAllWidthWhenBoth;
-                        break;
-
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
-
-        private static readonly Dictionary<string, string> _windowTitleAllShowDict = new()
-        {
-            { LocalizationHelper.GetString("ConfigurationName"), "1" },
-            { LocalizationHelper.GetString("ConnectionPreset"), "2" },
-            { LocalizationHelper.GetString("ConnectionAddress"), "3" },
-            { LocalizationHelper.GetString("ClientType"), "4" },
-        };
-
-        private List<string> _windowTitleAllShowList = [.. _windowTitleAllShowDict.Keys];
-
-        public List<string> WindowTitleAllShowList
-        {
-            get => _windowTitleAllShowList;
-            set => SetAndNotify(ref _windowTitleAllShowList, value);
-        }
-
-        private object[] _windowTitleSelectShowList = ConfigurationHelper.GetValue(ConfigurationKeys.WindowTitleSelectShowList, "1 2 3 4")
-            .Split(' ')
-            .Where(s => _windowTitleAllShowDict.ContainsValue(s.ToString()))
-            .Select(s => _windowTitleAllShowDict.FirstOrDefault(pair => pair.Value == s).Key)
-            .ToArray();
-
-        public object[] WindowTitleSelectShowList
-        {
-            get => _windowTitleSelectShowList;
-            set
-            {
-                SetAndNotify(ref _windowTitleSelectShowList, value);
-                UpdateWindowTitle();
-                var config = string.Join(' ', _windowTitleSelectShowList.Cast<string>().Select(s => _windowTitleAllShowDict[s]));
-                ConfigurationHelper.SetValue(ConfigurationKeys.WindowTitleSelectShowList, config);
-            }
-        }
-
-        private string _language = ConfigurationHelper.GetValue(ConfigurationKeys.Localization, LocalizationHelper.DefaultLanguage);
-
-        /// <summary>
-        /// Gets or sets the language.
-        /// </summary>
-        public string Language
-        {
-            get => _language;
-            set
-            {
-                if (value == _language)
-                {
-                    return;
-                }
-
-                if (_language == PallasLangKey)
-                {
-                    Hangover = true;
-                    Cheers = false;
-                }
-
-                if (value != PallasLangKey)
-                {
-                    SoberLanguage = value;
-                }
-
-                // var backup = _language;
-                ConfigurationHelper.SetValue(ConfigurationKeys.Localization, value);
-
-                var mainWindow = Application.Current.MainWindow;
-
-                if (mainWindow != null)
-                {
-                    mainWindow.Show();
-                    mainWindow.WindowState = mainWindow.WindowState = WindowState.Normal;
-                    mainWindow.Activate();
-                }
-
-                var result = MessageBoxHelper.Show(
-                    FormatText("{0}\n{1}", "LanguageChangedTip"),
-                    FormatText("{0}({1})", "Tip"),
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Question,
-                    ok: FormatText("{0}({1})", "Ok"),
-                    cancel: FormatText("{0}({1})", "ManualRestart"));
-                if (result == MessageBoxResult.OK)
-                {
-                    Bootstrapper.ShutdownAndRestartWithoutArgs();
-                }
-
-                SetAndNotify(ref _language, value);
-
-                return;
-
-                string FormatText(string text, string key)
-                    => string.Format(text, LocalizationHelper.GetString(key, value), LocalizationHelper.GetString(key, _language));
-            }
-        }
-
-        /// <summary>
-        /// Gets the language info.
-        /// </summary>
-        public string LanguageInfo
-        {
-            get
-            {
-                var language = (string)Application.Current.Resources["Language"];
-                return language == "Language" ? language : language + " / Language";
-            }
-        }
-
-        /// <summary>
-        /// Opername display language, can set force display when it was set as "OperNameLanguageForce.en-us"
-        /// </summary>
-        private string _operNameLanguage = ConfigurationHelper.GetValue(ConfigurationKeys.OperNameLanguage, "OperNameLanguageMAA");
-
-        public string OperNameLanguage
-        {
-            get
-            {
-                if (!_operNameLanguage.Contains('.'))
-                {
-                    return _operNameLanguage;
-                }
-
-                if (_operNameLanguage.Split('.')[0] != "OperNameLanguageForce" || !LocalizationHelper.SupportedLanguages.ContainsKey(_operNameLanguage.Split('.')[1]))
-                {
-                    return _operNameLanguage;
-                }
-
-                OperNameLanguageModeList.Add(new CombinedData { Display = LocalizationHelper.GetString("OperNameLanguageForce"), Value = "OperNameLanguageForce" });
-                return "OperNameLanguageForce";
-            }
-
-            set
-            {
-                if (value == _operNameLanguage.Split('.')[0])
-                {
-                    return;
-                }
-
-                switch (value)
-                {
-                    case "OperNameLanguageClient":
-                        ConfigurationHelper.SetValue(ConfigurationKeys.OperNameLanguage, value);
-                        break;
-
-                    case "OperNameLanguageMAA":
-                    default:
-                        ConfigurationHelper.SetValue(ConfigurationKeys.OperNameLanguage, "OperNameLanguageMAA");
-                        break;
-                }
-
-                var mainWindow = Application.Current.MainWindow;
-
-                if (mainWindow != null)
-                {
-                    mainWindow.Show();
-                    mainWindow.WindowState = mainWindow.WindowState = WindowState.Normal;
-                    mainWindow.Activate();
-                }
-
-                var result = MessageBoxHelper.Show(
-                    LocalizationHelper.GetString("LanguageChangedTip"),
-                    LocalizationHelper.GetString("Tip"),
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Question,
-                    ok: LocalizationHelper.GetString("Ok"),
-                    cancel: LocalizationHelper.GetString("ManualRestart"));
-                if (result == MessageBoxResult.OK)
-                {
-                    Bootstrapper.ShutdownAndRestartWithoutArgs();
-                }
-
-                SetAndNotify(ref _operNameLanguage, value);
-            }
-        }
-
-        public string OperNameLocalization
-        {
-            get
-            {
-                if (_operNameLanguage == "OperNameLanguageClient")
-                {
-                    return DataHelper.ClientLanguageMapper[_clientType];
-                }
-
-                if (!_operNameLanguage.Contains('.'))
-                {
-                    return _language;
-                }
-
-                if (_operNameLanguage.Split('.')[0] == "OperNameLanguageForce" && LocalizationHelper.SupportedLanguages.ContainsKey(_operNameLanguage.Split('.')[1]))
-                {
-                    return _operNameLanguage.Split('.')[1];
-                }
-
-                return _language;
-            }
-        }
-
-        #endregion 界面设置
-
         #region HotKey
 
         /// <summary>
@@ -3389,7 +1995,7 @@ namespace MaaWpfGui.ViewModels.UI
         // ReSharper disable once UnusedMember.Global
         public void SetAcknowledgedNightlyWarning()
         {
-            VersionUpdateDataContext.HasAcknowledgedNightlyWarning = true;
+            VersionUpdateSettings.HasAcknowledgedNightlyWarning = true;
         }
 
         /// <summary>
@@ -3405,9 +2011,9 @@ namespace MaaWpfGui.ViewModels.UI
                 prefix += " - ";
             }
 
-            List<string> windowTitleSelectShowList = _windowTitleSelectShowList
-                .Where(x => _windowTitleAllShowDict.ContainsKey(x?.ToString() ?? string.Empty))
-                .Select(x => _windowTitleAllShowDict[x?.ToString() ?? string.Empty]).ToList();
+            List<string> windowTitleSelectShowList = GuiSettings.WindowTitleSelectShowList
+                .Where(x => GuiSettingsUserControlModel.WindowTitleAllShowDict.ContainsKey(x?.ToString() ?? string.Empty))
+                .Select(x => GuiSettingsUserControlModel.WindowTitleAllShowDict[x?.ToString() ?? string.Empty]).ToList();
 
             string currentConfiguration = string.Empty;
             string connectConfigName = string.Empty;
@@ -3440,16 +2046,48 @@ namespace MaaWpfGui.ViewModels.UI
                 }
             }
 
-            string resourceVersion = !string.IsNullOrEmpty(VersionUpdateDataContext.ResourceVersion)
+            string resourceVersion = !string.IsNullOrEmpty(VersionUpdateSettings.ResourceVersion)
                 ? LocalizationHelper.CustomCultureInfo.Name.ToLowerInvariant() switch
                 {
-                    "zh-cn" => $" - {VersionUpdateDataContext.ResourceVersion}{VersionUpdateDataContext.ResourceDateTime:#MMdd}",
-                    "zh-tw" => $" - {VersionUpdateDataContext.ResourceVersion}{VersionUpdateDataContext.ResourceDateTime:#MMdd}",
-                    "en-us" => $" - {VersionUpdateDataContext.ResourceDateTime:dd/MM} {VersionUpdateDataContext.ResourceVersion}",
-                    _ => $" - {VersionUpdateDataContext.ResourceDateTime.ToString(LocalizationHelper.CustomCultureInfo.DateTimeFormat.ShortDatePattern.Replace("yyyy", string.Empty).Trim('/', '.'))} {VersionUpdateDataContext.ResourceVersion}",
+                    "zh-cn" => $" - {VersionUpdateSettings.ResourceVersion}{VersionUpdateSettings.ResourceDateTime:#MMdd}",
+                    "zh-tw" => $" - {VersionUpdateSettings.ResourceVersion}{VersionUpdateSettings.ResourceDateTime:#MMdd}",
+                    "en-us" => $" - {VersionUpdateSettings.ResourceDateTime:dd/MM} {VersionUpdateSettings.ResourceVersion}",
+                    _ => $" - {VersionUpdateSettings.ResourceDateTime.ToString(LocalizationHelper.CustomCultureInfo.DateTimeFormat.ShortDatePattern.Replace("yyyy", string.Empty).Trim('/', '.'))} {VersionUpdateSettings.ResourceVersion}",
                 }
                 : string.Empty;
             rvm.WindowTitle = $"{prefix}MAA{currentConfiguration} - {VersionUpdateSettingsUserControlModel.CoreVersion}{resourceVersion}{connectConfigName}{connectAddress}{clientName}";
         }
+
+        /// <summary>
+        /// Gets the client type.
+        /// </summary>
+        private string ClientName
+        {
+            get
+            {
+                foreach (var item in GameSettings.ClientTypeList.Where(item => item.Value == GameSettings.ClientType))
+                {
+                    return item.Display;
+                }
+
+                return "Unknown Client";
+            }
+        }
+
+        private readonly Dictionary<string, string> _serverMapping = new()
+        {
+            { string.Empty, "CN" },
+            { "Official", "CN" },
+            { "Bilibili", "CN" },
+            { "YoStarEN", "US" },
+            { "YoStarJP", "JP" },
+            { "YoStarKR", "KR" },
+            { "txwy", "ZH_TW" },
+        };
+
+        /// <summary>
+        /// Gets the server type.
+        /// </summary>
+        public string ServerType => _serverMapping[GameSettings.ClientType];
     }
 }

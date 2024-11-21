@@ -128,7 +128,7 @@ namespace MaaWpfGui.ViewModels.UI
 
             if (actions.ExitArknights)
             {
-                var mode = Instances.SettingsViewModel.ClientType;
+                var mode = SettingsViewModel.GameSettings.ClientType;
                 if (!Instances.AsstProxy.AsstStartCloseDown(mode))
                 {
                     AddLog(LocalizationHelper.GetString("CloseArknightsFailed"), UiLogColor.Error);
@@ -278,9 +278,11 @@ namespace MaaWpfGui.ViewModels.UI
             _stageManager = _container.Get<StageManager>();
 
             DisplayName = LocalizationHelper.GetString("Farming");
-            LogItemViewModels = new ObservableCollection<LogItemViewModel>();
+            LogItemViewModels = [];
             InitializeItems();
             InitTimer();
+
+            _ = UpdateDatePromptAndStagesWeb();
         }
 
         /*
@@ -386,17 +388,14 @@ namespace MaaWpfGui.ViewModels.UI
             }
 
             _isUpdatingDatePrompt = true;
-            UpdateDatePrompt();
-            UpdateStageList();
+            UpdateDatePromptAndStagesLocally();
 
             var delayTime = CalculateRandomDelay();
             _ = Task.Run(async () =>
             {
                 await Task.Delay(delayTime);
                 await _runningState.UntilIdleAsync(60000);
-                await _stageManager.UpdateStageWeb();
-                UpdateDatePrompt();
-                UpdateStageList();
+                await UpdateDatePromptAndStagesWeb();
                 _isUpdatingDatePrompt = false;
             });
         }
@@ -410,7 +409,7 @@ namespace MaaWpfGui.ViewModels.UI
                 return;
             }
 
-            if (!SettingsViewModel.VersionUpdateDataContext.UpdateAutoCheck)
+            if (!SettingsViewModel.VersionUpdateSettings.UpdateAutoCheck)
             {
                 return;
             }
@@ -420,7 +419,7 @@ namespace MaaWpfGui.ViewModels.UI
             _ = Task.Run(async () =>
             {
                 await Task.Delay(delayTime);
-                await SettingsViewModel.VersionUpdateDataContext.ManualUpdate();
+                await SettingsViewModel.VersionUpdateSettings.ManualUpdate();
                 _isCheckingForUpdates = false;
             });
         }
@@ -433,7 +432,7 @@ namespace MaaWpfGui.ViewModels.UI
 
             for (int i = 0; i < 8; ++i)
             {
-                if (!Instances.SettingsViewModel.TimerModels.Timers[i].IsOn)
+                if (!SettingsViewModel.TimerSettings.TimerModels.Timers[i].IsOn)
                 {
                     continue;
                 }
@@ -441,8 +440,8 @@ namespace MaaWpfGui.ViewModels.UI
                 DateTime startTime = new DateTime(currentTime.Year,
                     currentTime.Month,
                     currentTime.Day,
-                    Instances.SettingsViewModel.TimerModels.Timers[i].Hour,
-                    Instances.SettingsViewModel.TimerModels.Timers[i].Min,
+                    SettingsViewModel.TimerSettings.TimerModels.Timers[i].Hour,
+                    SettingsViewModel.TimerSettings.TimerModels.Timers[i].Min,
                     0);
                 DateTime restartDateTime = startTime.AddMinutes(-2);
 
@@ -453,7 +452,7 @@ namespace MaaWpfGui.ViewModels.UI
                 }
 
                 if (currentTime == restartDateTime &&
-                    Instances.SettingsViewModel.CurrentConfiguration != Instances.SettingsViewModel.TimerModels.Timers[i].TimerConfig)
+                    Instances.SettingsViewModel.CurrentConfiguration != SettingsViewModel.TimerSettings.TimerModels.Timers[i].TimerConfig)
                 {
                     timeToChangeConfig = true;
                     configIndex = i;
@@ -474,7 +473,7 @@ namespace MaaWpfGui.ViewModels.UI
 
         private async Task HandleTimerLogic(DateTime currentTime)
         {
-            if (!_runningState.GetIdle() && !Instances.SettingsViewModel.ForceScheduledStart)
+            if (!_runningState.GetIdle() && !SettingsViewModel.TimerSettings.ForceScheduledStart)
             {
                 return;
             }
@@ -497,25 +496,25 @@ namespace MaaWpfGui.ViewModels.UI
 
         private void HandleConfigChange(int configIndex)
         {
-            if (Instances.SettingsViewModel.CustomConfig &&
-                (_runningState.GetIdle() || Instances.SettingsViewModel.ForceScheduledStart))
+            if (SettingsViewModel.TimerSettings.CustomConfig &&
+                (_runningState.GetIdle() || SettingsViewModel.TimerSettings.ForceScheduledStart))
             {
-                Instances.SettingsViewModel.CurrentConfiguration = Instances.SettingsViewModel.TimerModels.Timers[configIndex].TimerConfig;
+                Instances.SettingsViewModel.CurrentConfiguration = SettingsViewModel.TimerSettings.TimerModels.Timers[configIndex].TimerConfig;
             }
         }
 
         private async Task HandleScheduledStart(int configIndex)
         {
-            if (Instances.SettingsViewModel.ForceScheduledStart)
+            if (SettingsViewModel.TimerSettings.ForceScheduledStart)
             {
-                if (Instances.SettingsViewModel.CustomConfig &&
-                    Instances.SettingsViewModel.CurrentConfiguration != Instances.SettingsViewModel.TimerModels.Timers[configIndex].TimerConfig)
+                if (SettingsViewModel.TimerSettings.CustomConfig &&
+                    Instances.SettingsViewModel.CurrentConfiguration != SettingsViewModel.TimerSettings.TimerModels.Timers[configIndex].TimerConfig)
                 {
-                    _logger.Warning($"Scheduled start skipped: Custom configuration is enabled, but the current configuration does not match the scheduled timer configuration (Timer Index: {configIndex}). Current Configuration: {Instances.SettingsViewModel.CurrentConfiguration}, Scheduled Configuration: {Instances.SettingsViewModel.TimerModels.Timers[configIndex].TimerConfig}");
+                    _logger.Warning($"Scheduled start skipped: Custom configuration is enabled, but the current configuration does not match the scheduled timer configuration (Timer Index: {configIndex}). Current Configuration: {Instances.SettingsViewModel.CurrentConfiguration}, Scheduled Configuration: {SettingsViewModel.TimerSettings.TimerModels.Timers[configIndex].TimerConfig}");
                     return;
                 }
 
-                if (Instances.SettingsViewModel.ShowWindowBeforeForceScheduledStart)
+                if (SettingsViewModel.TimerSettings.ShowWindowBeforeForceScheduledStart)
                 {
                     await Execute.OnUIThreadAsync(() => Instances.MainWindowManager?.Show());
                 }
@@ -536,7 +535,7 @@ namespace MaaWpfGui.ViewModels.UI
                     SetStopped();
                 }
 
-                var mode = Instances.SettingsViewModel.ClientType;
+                var mode = SettingsViewModel.GameSettings.ClientType;
                 if (!Instances.AsstProxy.AsstAppendCloseDown(mode))
                 {
                     AddLog(LocalizationHelper.GetString("CloseArknightsFailed"), UiLogColor.Error);
@@ -599,7 +598,7 @@ namespace MaaWpfGui.ViewModels.UI
                 "AutoRoguelike",
             ];
 
-            if (Instances.SettingsViewModel.ClientType is not "txwy")
+            if (SettingsViewModel.GameSettings.ClientType is not "txwy")
             {
                 taskList.Add("Reclamation");
             }
@@ -649,8 +648,7 @@ namespace MaaWpfGui.ViewModels.UI
 
             InitDrops();
             NeedToUpdateDatePrompt();
-            UpdateDatePrompt();
-            UpdateStageList();
+            UpdateDatePromptAndStagesLocally();
             RefreshCustomInfrastPlan();
 
             if (DateTime.UtcNow.ToYjDate().IsAprilFoolsDay())
@@ -679,6 +677,25 @@ namespace MaaWpfGui.ViewModels.UI
         public string GetValidStage(string stage)
         {
             return IsStageOpen(stage) ? stage : string.Empty;
+        }
+
+        /// <summary>
+        /// 更新日期提示和关卡列表
+        /// </summary>
+        public void UpdateDatePromptAndStagesLocally()
+        {
+            UpdateDatePrompt();
+            UpdateStageList();
+        }
+
+        /// <summary>
+        /// 访问 api 获取更新后更新日期提示和关卡列表
+        /// </summary>
+        /// <returns>可等待</returns>
+        public async Task UpdateDatePromptAndStagesWeb()
+        {
+            await _stageManager.UpdateStageWeb();
+            UpdateDatePromptAndStagesLocally();
         }
 
         /// <summary>
@@ -1173,7 +1190,7 @@ namespace MaaWpfGui.ViewModels.UI
             ClearLog();
 
             var buildDateTimeLong = VersionUpdateSettingsUserControlModel.BuildDateTimeCurrentCultureString;
-            var resourceDateTimeLong = SettingsViewModel.VersionUpdateDataContext.ResourceDateTimeCurrentCultureString;
+            var resourceDateTimeLong = SettingsViewModel.VersionUpdateSettings.ResourceDateTimeCurrentCultureString;
             AddLog($"Build Time:\n{buildDateTimeLong}\nResource Time:\n{resourceDateTimeLong}");
 
             var uiVersion = VersionUpdateSettingsUserControlModel.UiVersion;
@@ -1351,7 +1368,7 @@ namespace MaaWpfGui.ViewModels.UI
         {
             Waiting = true;
             AddLog(LocalizationHelper.GetString("Waiting"));
-            if (Instances.SettingsViewModel.RoguelikeDelayAbortUntilCombatComplete)
+            if (SettingsViewModel.RoguelikeTask.RoguelikeDelayAbortUntilCombatComplete)
             {
                 await WaitUntilRoguelikeCombatComplete();
 
@@ -1368,7 +1385,7 @@ namespace MaaWpfGui.ViewModels.UI
         private async Task WaitUntilRoguelikeCombatComplete()
         {
             int time = 0;
-            while (Instances.SettingsViewModel.RoguelikeDelayAbortUntilCombatComplete && RoguelikeInCombatAndShowWait && time < 600 && !Stopping)
+            while (SettingsViewModel.RoguelikeTask.RoguelikeDelayAbortUntilCombatComplete && RoguelikeInCombatAndShowWait && time < 600 && !Stopping)
             {
                 await Task.Delay(1000);
                 ++time;
@@ -1466,7 +1483,7 @@ namespace MaaWpfGui.ViewModels.UI
 
         private static bool AppendStart()
         {
-            var mode = Instances.SettingsViewModel.ClientType;
+            var mode = SettingsViewModel.GameSettings.ClientType;
             var enable = mode.Length != 0;
             Instances.SettingsViewModel.AccountName = Instances.SettingsViewModel.AccountName.Trim();
             var accountName = Instances.SettingsViewModel.AccountName;
@@ -1667,7 +1684,7 @@ namespace MaaWpfGui.ViewModels.UI
             var blackList = Instances.SettingsViewModel.CreditBlackList.Split(';', '；')
                 .Select(s => s.Trim());
 
-            blackList = blackList.Union(_blackCharacterListMapping[Instances.SettingsViewModel.ClientType]);
+            blackList = blackList.Union(_blackCharacterListMapping[SettingsViewModel.GameSettings.ClientType]);
 
             return Instances.AsstProxy.AsstAppendMall(
                 !string.IsNullOrEmpty(this.Stage) && Instances.SettingsViewModel.CreditFightTaskEnabled,
@@ -1743,31 +1760,31 @@ namespace MaaWpfGui.ViewModels.UI
 
         private static bool AppendRoguelike()
         {
-            _ = int.TryParse(Instances.SettingsViewModel.RoguelikeMode, out var mode);
+            _ = int.TryParse(SettingsViewModel.RoguelikeTask.RoguelikeMode, out var mode);
 
             return Instances.AsstProxy.AsstAppendRoguelike(
                 mode,
-                Instances.SettingsViewModel.RoguelikeDifficulty,
-                Instances.SettingsViewModel.RoguelikeStartsCount,
-                Instances.SettingsViewModel.RoguelikeInvestmentEnabled,
-                Instances.SettingsViewModel.RoguelikeInvestmentWithMoreScore,
-                Instances.SettingsViewModel.RoguelikeInvestsCount,
-                Instances.SettingsViewModel.RoguelikeStopWhenInvestmentFull,
-                Instances.SettingsViewModel.RoguelikeSquad,
-                Instances.SettingsViewModel.RoguelikeRoles,
-                DataHelper.GetCharacterByNameOrAlias(Instances.SettingsViewModel.RoguelikeCoreChar)?.Name ?? Instances.SettingsViewModel.RoguelikeCoreChar,
-                Instances.SettingsViewModel.RoguelikeStartWithEliteTwo,
-                Instances.SettingsViewModel.RoguelikeOnlyStartWithEliteTwo,
-                Instances.SettingsViewModel.Roguelike3FirstFloorFoldartal,
-                Instances.SettingsViewModel.Roguelike3StartFloorFoldartal,
-                Instances.SettingsViewModel.Roguelike3NewSquad2StartingFoldartal,
-                Instances.SettingsViewModel.Roguelike3NewSquad2StartingFoldartals,
-                Instances.SettingsViewModel.RoguelikeExpectedCollapsalParadigms,
-                Instances.SettingsViewModel.RoguelikeUseSupportUnit,
-                Instances.SettingsViewModel.RoguelikeEnableNonfriendSupport,
-                Instances.SettingsViewModel.RoguelikeTheme,
-                Instances.SettingsViewModel.RoguelikeRefreshTraderWithDice,
-                Instances.SettingsViewModel.RoguelikeStopAtFinalBoss);
+                SettingsViewModel.RoguelikeTask.RoguelikeDifficulty,
+                SettingsViewModel.RoguelikeTask.RoguelikeStartsCount,
+                SettingsViewModel.RoguelikeTask.RoguelikeInvestmentEnabled,
+                SettingsViewModel.RoguelikeTask.RoguelikeInvestmentWithMoreScore,
+                SettingsViewModel.RoguelikeTask.RoguelikeInvestsCount,
+                SettingsViewModel.RoguelikeTask.RoguelikeStopWhenInvestmentFull,
+                SettingsViewModel.RoguelikeTask.RoguelikeSquad,
+                SettingsViewModel.RoguelikeTask.RoguelikeRoles,
+                DataHelper.GetCharacterByNameOrAlias(SettingsViewModel.RoguelikeTask.RoguelikeCoreChar)?.Name ?? SettingsViewModel.RoguelikeTask.RoguelikeCoreChar,
+                SettingsViewModel.RoguelikeTask.RoguelikeStartWithEliteTwo,
+                SettingsViewModel.RoguelikeTask.RoguelikeOnlyStartWithEliteTwo,
+                SettingsViewModel.RoguelikeTask.Roguelike3FirstFloorFoldartal,
+                SettingsViewModel.RoguelikeTask.Roguelike3StartFloorFoldartal,
+                SettingsViewModel.RoguelikeTask.Roguelike3NewSquad2StartingFoldartal,
+                SettingsViewModel.RoguelikeTask.Roguelike3NewSquad2StartingFoldartals,
+                SettingsViewModel.RoguelikeTask.RoguelikeExpectedCollapsalParadigms,
+                SettingsViewModel.RoguelikeTask.RoguelikeUseSupportUnit,
+                SettingsViewModel.RoguelikeTask.RoguelikeEnableNonfriendSupport,
+                SettingsViewModel.RoguelikeTask.RoguelikeTheme,
+                SettingsViewModel.RoguelikeTask.RoguelikeRefreshTraderWithDice,
+                SettingsViewModel.RoguelikeTask.RoguelikeStopAtFinalBoss);
         }
 
         private static bool AppendReclamation()
